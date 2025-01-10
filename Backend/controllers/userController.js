@@ -1,10 +1,11 @@
-const User = require('../model/user');  // Importer le modèle User
+const User = require('../models/user');  // Importer le modèle User
 
 // Fonction pour créer un utilisateur
 const createUser = async (req, res) => {
     const { email, password, role } = req.body;  // Récupérer les données du body de la requête
     try {
-        const newUser = await User.createUser(email, password, role);  // Appeler la méthode createUser du modèle User
+        const hashedPassword = await bcrypt.hash(password, 10);  // Hachage ici
+        const newUser = await User.createUser(email, hashedPassword, role);  // Appeler la méthode createUser du modèle User
         res.status(201).json(newUser);  // Retourner la réponse en JSON
     } catch (err) {
         console.error('Error creating user:', err);
@@ -27,4 +28,27 @@ const getUserByEmail = async (req, res) => {
     }
 };
 
-module.exports = { createUser, getUserByEmail };
+
+
+const loginUser = async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const user = await User.getUserByEmail(email);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password); // Vérifier le mot de passe
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' }); // Générer le token JWT
+        res.status(200).json({ message: 'Login successful', token });
+    } catch (err) {
+        console.error('Error logging in user:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+};
+
+module.exports = { createUser, getUserByEmail, loginUser };
